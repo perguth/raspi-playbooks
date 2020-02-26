@@ -1,0 +1,8 @@
+---
+
+- name: Duck DNS
+  host: raspberrypi
+  tasks:
+    - name: Create update script
+    - name: Insert token
+    - name: Set up cronjob

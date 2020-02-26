@@ -1,0 +1,17 @@
+---
+
+- name: Syncthing
+  hosts: root@host
+  tasks:
+    - Add release PGP keys
+      apt_key:
+        url: https://syncthing.net/release-key.txt
+        id: D26E6ED000654A3E
+    - Add APT repository
+      apt_repository:
+        repo: deb https://apt.syncthing.net/ syncthing stable
+        filename: syncthing
+        update_cache: yes
+    - Install `syncthing`
+      apt:
+        name: syncthing

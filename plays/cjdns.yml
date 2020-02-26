@@ -1,0 +1,113 @@
+---
+
+- name: CJDNS
+  hosts: root
+  vars_prompt:
+    - name: build
+      promt: Update CJDNS?
+      default: yes
+      private: no
+    - name: reset
+      promt: Reset CJDNS config?
+      default: no
+      private: no
+  tasks:
+    - name: Install dependencies
+      apt:
+        name: '{{item}}'
+        state: present
+      with_items:
+        - nodejs
+        - build-essential
+        - git-svn
+    - name: Clone repository
+      git:
+        repo: https://github.com/cjdelisle/cjdns.git
+        dest: /opt/cjdns
+        update: yes # default
+    - name: Build
+      shell: NO_TEST=1 Seccomp_NO=1 nodejs node_build/make.js
+      args:
+        chdir: /opt/cjdns
+      when: build == 'True'
+    - name: Symlink executable
+      file:
+        src: /opt/cjdns/cjdroute
+        dest: /usr/local/bin/cjdroute
+        state: link
+    - name: Reset CJDNS config
+      file:
+        path: /etc/cjdroute.conf
+        state: absent
+      when: reset != 'False'
+    - name: Check if `cjdroute.conf` exists
+      shell: ls -ld /etc/cjdroute.conf
+      register: conf_exists
+      ignore_errors: yes
+    - block: # configure CJDNS
+      - name: Import vault
+        include_vars: ../credentials.yml
+      - name: Create `cjdroute.conf`
+        shell: (umask 077 && /opt/cjdns/cjdroute --genconf > /etc/cjdroute.conf)
+        args:
+          creates: /etc/cjdroute.conf
+      - name: Add hetzner IPv4 peer
+        replace:
+          dest: /etc/cjdroute.conf
+          regexp: '^\s*// "ipv4 address:port": {'
+          replace: '{{hetzner_cjdns_login_v4}}'
+      - name: Add hetzner IPv6 peer
+        replace:
+          dest: /etc/cjdroute.conf
+          regexp: ^.*IPv6 only.*\n.*\n.*
+          replace: '"connectTo":\n{\n{{hetzner_cjdns_login_v6}}'
+      - name: Remove non-JSON line comments from `cjdroute.conf`
+        register: cjdns_remove_invalid_comments
+        lineinfile:
+          dest: /etc/cjdroute.conf
+          regexp: ^\s*\/\/.*
+          state: absent
+      - block: # Remove non-JSON comment blocks from `cjdroute.conf`
+        - name: Mark beginning of comment blocks
+          replace:
+            dest: /etc/cjdroute.conf
+            regexp: ^\s*\/\*.*
+            replace: <!-- BEGIN ANSIBLE MANAGED BLOCK -->
+        - name: Mark end of comment blocks
+          replace:
+            dest: /etc/cjdroute.conf
+            regexp: ^\s*\*\/.*
+            replace: <!-- END ANSIBLE MANAGED BLOCK -->
+        - name: Remove marked blocks
+          register: cjdns_remove_invalid_comment_blocks
+          blockinfile:
+            dest: /etc/cjdroute.conf
+            marker: <!-- {mark} ANSIBLE MANAGED BLOCK -->
+            block: ''
+      - name: Install service
+        shell: cp /opt/cjdns/contrib/systemd/cjdns.service /etc/systemd/system/
+        args:
+          creates: /etc/systemd/system/cjdns.service
+      - name: Enable service
+        ignore_errors: yes # it fails but works nonetheless
+        systemd:
+          name: cjdns
+          daemon_reload: yes
+          enabled: yes
+      when: conf_exists|failed
+    - name: (Re-)start service
+      systemd:
+        name: cjdns
+        state: restarted
+    - name: Get `cjdroute.conf`
+      fetch:
+        src: /etc/cjdroute.conf
+        dest: ../
+        flat: true
+
+# - name: Tools
+#   hosts: root@host
+#   tasks:
+#     - name: Install Golang
+#     - name: Set up environment
+#     - name: Install `cjdcmd-ng`

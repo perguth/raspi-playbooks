@@ -1,0 +1,12 @@
+---
+
+- name: Hostname
+  hosts: root
+  vars_prompt:
+    - name: hostname
+      promt: What should the hostname be?
+      private: no
+  tasks:
+    - name: Change hostname
+      hostname:
+        name: '{{hostname}}'

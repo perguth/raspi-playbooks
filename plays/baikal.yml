@@ -1,0 +1,59 @@
+---
+
+- name: Baikal
+  hosts: root@host
+  tasks:
+  - name: Install dependencies
+    apt:
+      name: '{{item}}'
+      state: present
+    with_items:
+      - nginx
+      - php5-fpm
+      - php5-sqlite
+  - block: # Install Composer
+    - name: Download composer
+      get_url:
+        url: https://getcomposer.org/installer
+        dest: /tmp/composer-installer.php
+        mode: 0755
+    - name: Install composer
+      shell: cat /tmp/composer-installer.php | php -- --install-dir=/usr/local/bin
+      args:
+        creates: /usr/local/bin/composer.phar
+    - name: Rename composer.phar to composer
+      shell: mv /usr/local/bin/composer.phar /usr/local/bin/composer
+      args:
+        creates: /usr/local/bin/composer
+    - name: Make composer executable
+      file:
+        path: /usr/local/bin/composer
+        mode: a+x
+        state: file
+  - name: Checkout Baikal
+    git:
+      repo: https://github.com/fruux/Baikal.git
+      dest: /var/www/baikal
+      version: 0.4.6
+      update: no
+  - name: Install Baikal dependencies
+    shell: php composer install --no-plugins --no-scripts
+    args:
+      chdir: /var/www/baikal
+  - name: Make DB folder writeable for NGINX
+    file:
+      path: /var/www/baikal/Specific/
+      state: directory
+      owner: www-data
+      group: www-data
+  - name: Install NGINX sites file
+    copy:
+      src: assets/nginx/baikal
+      dest: /etc/nginx/sites-available/baikal
+      force: yes
+  - name: Enable NGINX configuration file
+    file:
+      src: /etc/nginx/sites-available/baikal
+      dest: /etc/nginx/sites-enabled/baikal
+      state: link
+  # TODO Move DB to USB

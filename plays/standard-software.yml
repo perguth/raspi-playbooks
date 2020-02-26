@@ -1,0 +1,26 @@
+---
+
+- name: Standard software
+  hosts: root
+  tasks:
+  - name: Install standard software
+    apt:
+      name: '{{item}}'
+      state: installed
+    with_items:
+      - git-svn
+      - watch
+      - htop
+      - nmap
+      - nload
+      - screen
+      - btrfs-tools
+  - name: Install smartmontools
+    apt:
+      name: smartmontools
+      install_recommends: no
+  - name: Update packages and clean up
+    apt:
+      update_cache: yes
+      upgrade: dist
+      autoclean: yes

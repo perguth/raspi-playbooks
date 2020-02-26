@@ -1,0 +1,5 @@
+---
+- include: plays/ssh.yml
+- include: plays/cjdns.yml
+- include: plays/standard-software.yml
+- include: plays/hostname.yml

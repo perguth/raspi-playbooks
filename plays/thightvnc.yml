@@ -1,0 +1,8 @@
+---
+
+- name: ThightVNC
+  hosts: root@host
+  tasks:
+    - name: Install `tightvnc`
+      apt:
+        - name: tightvncserver

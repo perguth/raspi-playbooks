@@ -1,0 +1,51 @@
+---
+
+- name: SSH part 1
+  hosts: root
+  become: true
+  tasks:
+    - block:
+      # TODO: name: Regenerate SSH host keys
+      - name: Add SSH key for user `pi`
+        register: add_ssh_key
+        authorized_key:
+          user: pi
+          state: present
+          key: '{{ item }}'
+        with_file:
+          - ../assets/pguth@pc.pub
+      - name: Add SSH key for user `root`
+        register: add_ssh_key
+        authorized_key:
+          user: root
+          state: present
+          key: '{{ item }}'
+        with_file:
+          - ../assets/pguth@pc.pub
+      - name: Disable password login
+        when: add_ssh_key|success
+        lineinfile: dest=/etc/ssh/sshd_config regexp="^#?PasswordAuthentication" line="PasswordAuthentication no"
+      - name: Install `fingerprint` script
+        copy:
+          src: ../assets/fingerprint
+          dest: /usr/local/bin/fingerprint
+          mode: a+x
+          force: yes # in order to update it
+      - name: Change password # Must be last change, no more `become: true` afterwards, no more password logins
+        user:
+          name: pi
+          update_password: always
+          password: $6$rounds=656000$VHr/lmy6I9UZe9sF$ws2FpKuSQ1re8hsAJLQGdmAEhh2dm6uFd6gsCcNQn0qRxSflnkJbCOi2i9fS48tN2xKTkjYx7Sr7Pd4gG1aXZ/
+
+- name: SSH part 2
+  hosts: root
+  tasks:
+    - name: Require password to execute `sudo`
+      file:
+        path: /etc/sudoers.d/010_pi-nopasswd
+        state: absent
+      ignore_errors: yes
+    - name: Reload sshd
+      systemd:
+        name: ssh
+        state: reloaded

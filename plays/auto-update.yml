@@ -1,0 +1,6 @@
+---
+
+- name: Auto update
+  hosts: root
+  tasks:
+    - 
